@@ -16,10 +16,54 @@ $ docker build -t slurmathon .
 $ docker image ls
 REPOSITORY                       TAG       IMAGE ID       CREATED         SIZE
 slurmathon                       latest    fdcdaed22ad9   9 minutes ago   251MB
-rstudio/workbench-docker         latest    b0db36ba52c8   4 days ago      8.48GB
-rstudio/connect-docker           latest    95a7f156e8d3   2 weeks ago     7.04GB
-rstudio/package_manager-docker   latest    86b4af1f0ddb   2 weeks ago     1.55GB
-ubuntu                           20.04     f78909c2b360   5 weeks ago     72.8MB
-postgis-docker                   latest    03708fc7de78   4 months ago    582MB
 
 $ docker run -it slurmathon
+```
+
+Ok, it runs in interactive mode.  Can I start `slurmctld` and `slurmd` in the container?
+
+```
+$ docker run -it slurmathon
+root@ca160ab5cb49:/# service start slurmctld
+start: unrecognized service
+root@ca160ab5cb49:/# service slurmctld start
+ * Starting slurm central management daemon slurmctld                                                                                                                      [ OK ] 
+root@ca160ab5cb49:/# service slurmd start
+ * Starting slurm compute node daemon slurmd                                                                                                                               [ OK ] 
+```
+
+Yes, the services start. 
+
+Can I do anything with the slurm queue etc?  In the container...
+
+```
+# scontrol update nodename=localhost state=idle
+scontrol: error: If munged is up, restart with --num-threads=10
+scontrol: error: Munge encode failed: Failed to access "/run/munge/munge.socket.2": No such file or directory
+scontrol: error: authentication: Invalid authentication credential
+slurm_update error: Protocol authentication error
+```
+
+Nope... to Rika's point, we need munge running.  Added it to startup script.
+
+```
+# ./start_slurm.sh 
+Starting the slurmctld daemon
+ * Starting slurm central management daemon slurmctld                                                                                                                      [ OK ] 
+Starting the slurmd daemon
+ * Starting slurm compute node daemon slurmd                                                                                                                               [ OK ] 
+Starting the munge daemon
+ * Starting MUNGE munged 
+ ```
+ 
+ And checking further...
+ 
+ ```
+ # sinfo
+PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
+LocalQ*      up   infinite      1  drain localhost
+```
+
+So supposedly I now have a queue called LocalQ that you can now submit your work to.
+
+Now what?
