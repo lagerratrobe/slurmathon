@@ -1,131 +1,92 @@
 # SLURMATHON
 
-Exploratory work on using SLURM.  Using [this article](https://drtailor.medium.com/how-to-setup-slurm-on-ubuntu-20-04-for-single-node-work-scheduling-6cc909574365) as a starting point.  
-
-### Goal
+## Goal
 
 > Provision a single node (either EC2 or local docker container in a linux distro of your choice) and install SLURM in a single node setup (compute node = head node). Demonstrate that you both can launch batch and interactive jobs on the one-node cluster via the SLURM CLI (sbatch, scontrol, srun, squeue, scancel, sinfo....) Setting up an accounting DB (using mysql) and/or various queues with different priorities would be a bonus here.
 
-### Notes
+## How to use this repo
 
-Created simple Dockerfile and slurm.conf to use in Container.
+### Step 1: Clone the repo
+Needs at least 4 CPU cores and 4 GB of RAM avail.
 
+### Step 2: Build the docker image
 ```
 $ docker build -t slurmathon .
-
-$ docker image ls
-REPOSITORY                       TAG       IMAGE ID       CREATED         SIZE
-slurmathon                       latest    fdcdaed22ad9   9 minutes ago   251MB
-
-$ docker run -it slurmathon
 ```
 
-Ok, it runs in interactive mode.  Can I start `slurmctld` and `slurmd` in the container?
-
+### Step 3: Run the image in interactive mode
 ```
-$ docker run -it slurmathon
-root@ca160ab5cb49:/# service start slurmctld
-start: unrecognized service
-root@ca160ab5cb49:/# service slurmctld start
- * Starting slurm central management daemon slurmctld                                                                                                                      [ OK ] 
-root@ca160ab5cb49:/# service slurmd start
- * Starting slurm compute node daemon slurmd                                                                                                                               [ OK ] 
+$ docker run -it --privileged slurmathon
 ```
 
-Yes, the services start. 
-
-Can I do anything with the slurm queue etc?  In the container...
-
+### Step 4: Start the slurm and munge daemons
 ```
-# scontrol update nodename=localhost state=idle
-scontrol: error: If munged is up, restart with --num-threads=10
-scontrol: error: Munge encode failed: Failed to access "/run/munge/munge.socket.2": No such file or directory
-scontrol: error: authentication: Invalid authentication credential
-slurm_update error: Protocol authentication error
-```
-
-Nope... to Rika's point, we need munge running.  Added it to startup script.
-
-```
-# ./start_slurm.sh 
+$ ./start_slurm.sh 
 Starting the slurmctld daemon
  * Starting slurm central management daemon slurmctld                                                                                                                      [ OK ] 
 Starting the slurmd daemon
  * Starting slurm compute node daemon slurmd                                                                                                                               [ OK ] 
 Starting the munge daemon
- * Starting MUNGE munged 
+ * Starting MUNGE munged
  ```
  
- And checking further...
- 
- ```
- # sinfo
+### Step 5: Check your partition
+Check that you have a 1 node partition up and available.
+
+```
+$ sinfo
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
-LocalQ*      up   infinite      1  drain localhost
+LocalQ*      up   infinite      1   idle localhost
 ```
 
-So supposedly I now have a queue called LocalQ that you can now submit your work to.
-
-Now what?
-
-## Submitting jobs to SLURM
-
-See https://docs.rc.uab.edu/cheaha/slurm/submitting_jobs/
-
-Run this in the container in an interactive session.
+### Step 6: Submit a job to the partition
 
 ```
-#! /usr/bin/bash
-
-# testjob.sh
-#SBATCH --job-name=test
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem=1G
-#SBATCH --partition=LocalQ
-#SBATCH --time=00:10:00
-#SBATCH --output=%x_%j.out
-#SBATCH --error=%x_%j.err
-
-echo "Hello World"
-echo "Hello Error" 1>&2
-```
-
-Submit that testjob with...
-
-```
-# sbatch testjob.sh
+$ sbatch testjob.sh
 Submitted batch job 2
 ```
 
-Checking status...
+### Step 7: Verify that job ran properly
+
+See https://docs.rc.uab.edu/cheaha/slurm/submitting_jobs/ for additional info.
 
 ```
-# scontrol show job 2                
+$ scontrol show job 2 
+
 JobId=2 JobName=test
    UserId=root(0) GroupId=root(0) MCS_label=N/A
    Priority=4294901759 Nice=0 Account=(null) QOS=(null)
-   JobState=PENDING Reason=Nodes_required_for_job_are_DOWN,_DRAINED_or_reserved_for_jobs_in_higher_priority_partitions Dependency=(null)
+   JobState=COMPLETED Reason=None Dependency=(null)  <--------------- look for "COMPLETED"
    Requeue=1 Restarts=0 BatchFlag=1 Reboot=0 ExitCode=0:0
    RunTime=00:00:00 TimeLimit=00:10:00 TimeMin=N/A
-   SubmitTime=2024-01-23T20:05:57 EligibleTime=2024-01-23T20:05:57
-   AccrueTime=2024-01-23T20:05:57
-   StartTime=Unknown EndTime=Unknown Deadline=N/A
-   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2024-01-23T20:08:43
-   Partition=LocalQ AllocNode:Sid=aed62a670923:1
+   SubmitTime=2024-01-23T21:19:19 EligibleTime=2024-01-23T21:19:19
+   AccrueTime=2024-01-23T21:19:19
+   StartTime=2024-01-23T21:19:20 EndTime=2024-01-23T21:19:20 Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2024-01-23T21:19:20
+   Partition=LocalQ AllocNode:Sid=ea2dc023785a:1
    ReqNodeList=(null) ExcNodeList=(null)
-   NodeList=(null)
-   NumNodes=1-1 NumCPUs=1 NumTasks=1 CPUs/Task=1 ReqB:S:C:T=0:0:*:*
-   TRES=cpu=1,mem=1G,node=1,billing=1
+   NodeList=localhost
+   BatchHost=localhost
+   NumNodes=1 NumCPUs=1 NumTasks=1 CPUs/Task=1 ReqB:S:C:T=0:0:*:*
+   TRES=cpu=1,node=1,billing=1
    Socks/Node=* NtasksPerN:B:S:C=0:0:*:* CoreSpec=*
    MinCPUsNode=1 MinMemoryNode=1G MinTmpDiskNode=0
    Features=(null) DelayBoot=00:00:00
    OverSubscribe=OK Contiguous=0 Licenses=(null) Network=(null)
-   Command=/root/testjob.sh
-   WorkDir=/root
-   StdErr=/root/test_2.err
+   Command=//testjob.sh
+   WorkDir=/
+   StdErr=//test_2.err <------ Check this was written
    StdIn=/dev/null
-   StdOut=/root/test_2.out
+   StdOut=//test_2.out  <----- Check this was written
    Power=
+   
+$ ls -l test*
+-rw-r--r-- 1 root root  12 Jan 23 21:19 test_2.err
+-rw-r--r-- 1 root root  12 Jan 23 21:19 test_2.out
 ```
+
+## To Do:
+* Get slurm and munge daemons started when container is run
+* Figure out how to submit a job from the host machine to the SLURM queue/partition in the container
+* "accounting DB" use-case or something similar
+

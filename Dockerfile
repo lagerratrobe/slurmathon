@@ -2,9 +2,10 @@
 FROM ubuntu:20.04
 
 RUN apt update -y && \
-    apt install slurmd slurmctld vim systemd munge libmunge2 libmunge-dev -y
+    apt install slurmd slurmctld vim systemd munge libmunge2 libmunge-dev htop -y
 
 COPY slurm.conf /etc/slurm-llnl/slurm.conf
+COPY testjob.sh /testjob.sh
 
 #ENTRYPOINT service slurmctld start && /bin/bash
 
