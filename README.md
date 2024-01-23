@@ -67,3 +67,65 @@ LocalQ*      up   infinite      1  drain localhost
 So supposedly I now have a queue called LocalQ that you can now submit your work to.
 
 Now what?
+
+## Submitting jobs to SLURM
+
+See https://docs.rc.uab.edu/cheaha/slurm/submitting_jobs/
+
+Run this in the container in an interactive session.
+
+```
+#! /usr/bin/bash
+
+# testjob.sh
+#SBATCH --job-name=test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
+#SBATCH --partition=LocalQ
+#SBATCH --time=00:10:00
+#SBATCH --output=%x_%j.out
+#SBATCH --error=%x_%j.err
+
+echo "Hello World"
+echo "Hello Error" 1>&2
+```
+
+Submit that testjob with...
+
+```
+# sbatch testjob.sh
+Submitted batch job 2
+```
+
+Checking status...
+
+```
+# scontrol show job 2                
+JobId=2 JobName=test
+   UserId=root(0) GroupId=root(0) MCS_label=N/A
+   Priority=4294901759 Nice=0 Account=(null) QOS=(null)
+   JobState=PENDING Reason=Nodes_required_for_job_are_DOWN,_DRAINED_or_reserved_for_jobs_in_higher_priority_partitions Dependency=(null)
+   Requeue=1 Restarts=0 BatchFlag=1 Reboot=0 ExitCode=0:0
+   RunTime=00:00:00 TimeLimit=00:10:00 TimeMin=N/A
+   SubmitTime=2024-01-23T20:05:57 EligibleTime=2024-01-23T20:05:57
+   AccrueTime=2024-01-23T20:05:57
+   StartTime=Unknown EndTime=Unknown Deadline=N/A
+   SuspendTime=None SecsPreSuspend=0 LastSchedEval=2024-01-23T20:08:43
+   Partition=LocalQ AllocNode:Sid=aed62a670923:1
+   ReqNodeList=(null) ExcNodeList=(null)
+   NodeList=(null)
+   NumNodes=1-1 NumCPUs=1 NumTasks=1 CPUs/Task=1 ReqB:S:C:T=0:0:*:*
+   TRES=cpu=1,mem=1G,node=1,billing=1
+   Socks/Node=* NtasksPerN:B:S:C=0:0:*:* CoreSpec=*
+   MinCPUsNode=1 MinMemoryNode=1G MinTmpDiskNode=0
+   Features=(null) DelayBoot=00:00:00
+   OverSubscribe=OK Contiguous=0 Licenses=(null) Network=(null)
+   Command=/root/testjob.sh
+   WorkDir=/root
+   StdErr=/root/test_2.err
+   StdIn=/dev/null
+   StdOut=/root/test_2.out
+   Power=
+```
