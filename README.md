@@ -86,7 +86,21 @@ $ ls -l test*
 ```
 
 ## To Do:
-* Get slurm and munge daemons started when container is run
-* Figure out how to submit a job from the host machine to the SLURM queue/partition in the container
-* "accounting DB" use-case or something similar
+* [ ] - Get slurm and munge daemons started when container is run
+* [ ] - Figure out how to submit a job from the host machine to the SLURM queue/partition in the container
+* ~~"accounting DB" use-case or something similar~~
+
+## Making the service accessible from Host
+
+"The default port used by slurmctld to listen for incoming requests is 6817. This port can be changed with the SlurmctldPort slurm. conf parameter."  Looks like 6818 is also needed by slurmd.  
+
+
+
+## Additional info
+- https://drtailor.medium.com/how-to-setup-slurm-on-ubuntu-20-04-for-single-node-work-scheduling-6cc909574365 (sorta works, but has missing info)
+- slurm.conf parameters ( https://slurm.schedmd.com/slurm.conf.html)
+- https://slurm.schedmd.com/quickstart.html  (Really the foundational place for info)
+- https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601 (overview of Dockerized setup with separate control and worker nodes.  Probably more realistic)
+- http://docs.nanomatch.de/technical/SimStackRequirements/SingleNodeSlurm.html (good generic info on single node)
+
 

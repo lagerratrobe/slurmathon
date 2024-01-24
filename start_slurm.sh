@@ -10,3 +10,5 @@ service slurmd start
 
 echo "Starting the munge daemon"
 service munge start
+
+tail -f /dev/null
