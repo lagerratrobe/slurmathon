@@ -86,14 +86,132 @@ $ ls -l test*
 ```
 
 ## To Do:
-* [ ] - Get slurm and munge daemons started when container is run
+* [X] - Get slurm and munge daemons started when container is run
 * [ ] - Figure out how to submit a job from the host machine to the SLURM queue/partition in the container
 * ~~"accounting DB" use-case or something similar~~
 
 ## Making the service accessible from Host
 
-"The default port used by slurmctld to listen for incoming requests is 6817. This port can be changed with the SlurmctldPort slurm. conf parameter."  Looks like 6818 is also needed by slurmd.  
+"The default port used by slurmctld to listen for incoming requests is 6817. This port can be changed with the SlurmctldPort slurm. conf parameter."  Looks like 6818 is also needed by slurmd.  Opened those ports in the DOCKERFILE, need to also run the container and map the ports
 
+```
+docker run -d --privileged slurmathon -p 6817:6817 -p 6818:6818 --name slurm
+```
+
+Ok, it's running in the container and ostensibly accessible.  How to I access the job queue from my host?
+
+> If you install the Slurm client on Server B . Copy your slurm.conf to it and then ensure it has the correct authentication (i.e the correct Munge key) , it should work.
+
+Ok, so assuming that my host machine is "Server B" in this case, I need the `slurm.conf` and munge key.
+
+```
+# On host
+sudo apt install slurm-client munge
+sudo chmod 444 /etc/munge/munge.key
+sudo cp /etc/munge/munge.key ./
+sudo chown randre:randre munge.key
+
+# ADD to Dockerfile
+COPY munge.key /etc/munge/munge.key
+RUN chmod 400 /etc/munge/munge.key
+RUN chown 102:102 /etc/munge/munge.key
+```
+
+Ran `docker inspect` on the container:
+
+```
+$ docker inspect f98d8d113a06
+
+IP = 172.17.0.6
+```
+
+Ran nc against that Ip and port 6818...
+
+```
+$ nc 172.17.0.6 6818
+�"A���e�MUNGE:AwQFAABl8v1Ihj6iM+IoXZbVo6zCSGsXSK010B28FzxRu6Ud6sPAxj8OfI2VrwYXHJpxUw2pCRo8OkRz7ReN9r7jWyNAecoKrHLGi0zMMyNAJDwN9RkdaUhC7CO3vY8RBTfBKaY=:�
+```
+...promising.
+
+Update slurm.conf on host to use that container IP...
+
+```
+$ sinfo
+PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
+LocalQ*      up   infinite      1   idle localhost
+```
+
+- Updated the `/etc/slurm-llnl/slurm.conf` so that SlurmctldHost=172.17.0.6
+
+- ran `sinfo` and could see the partition
+```
+$ sinfo
+PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
+LocalQ*      up   infinite      1   idle localhost
+```
+
+- Submited a test job:
+`$ sbatch testjob.sh
+Submitted batch job 2
+`
+
+- Checked status... not completed
+```
+$ scontrol show job 2 
+JobId=2 JobName=test
+   UserId=randre(1000) GroupId=randre(1000) MCS_label=N/A
+   Priority=4294901759 Nice=0 Account=(null) QOS=(null)
+   JobState=PENDING Reason=BeginTime Dependency=(null)
+```
+- Checked the queue to see why pending...
+```
+$ squeue --format="%.18i %.9P %.30j %.8u %.8T %.10M %.9l %.6D %R" --partition="LocalQ" --states="PENDING,RUNNING"
+             JOBID PARTITION                           NAME     USER    STATE       TIME TIME_LIMI  NODES NODELIST(REASON)
+                 2    LocalQ                           test   randre  PENDING       0:00     10:00      1 (BeginTime)
+```
+- Checked my testjob to see what it says...
+```
+$ cat testjob.sh 
+#! /usr/bin/bash
+
+# testjob.sh
+#SBATCH --job-name=test
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=1G
+#SBATCH --partition=LocalQ
+#SBATCH --time=00:10:00 <----------- problem
+#SBATCH --output=%x_%j.out
+#SBATCH --error=%x_%j.err
+
+echo "Hello World"
+echo "Hello Error" 1>&2
+```
+- Changed job to have a --begin directive instead of --time
+```
+#SBATCH --begin=now+5
+```
+
+- Canceled the job
+```
+$ scancel 2
+```
+
+- Resubmitted the testjob.sh 
+```
+$ sbatch testjob.sh
+Submitted batch job 3
+```
+
+- Rechecked the status:
+
+```
+scontrol show job 3
+JobState=PENDING Reason=BeginTime
+```
+
+- Pretty sure I have a time mismatch of some sort between host and container.  Good enough for now though.
 
 
 ## Additional info
@@ -102,5 +220,6 @@ $ ls -l test*
 - https://slurm.schedmd.com/quickstart.html  (Really the foundational place for info)
 - https://medium.com/analytics-vidhya/slurm-cluster-with-docker-9f242deee601 (overview of Dockerized setup with separate control and worker nodes.  Probably more realistic)
 - http://docs.nanomatch.de/technical/SimStackRequirements/SingleNodeSlurm.html (good generic info on single node)
-
+- https://southgreenplatform.github.io/trainings/hpc/slurminstallation/ (Slurm Admin training)
+- https://ecs.rutgers.edu/slurm_commands.html  (another univ how-to)
 
