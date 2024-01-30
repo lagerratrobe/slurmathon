@@ -89,7 +89,7 @@ $ ls -l test*
 
 ## To Do:
 * [X] - Get slurm and munge daemons started when container is run
-* [ ] - Figure out how to submit a job from the host machine to the SLURM queue/partition in the container
+* [X] - Figure out how to submit a job from the host machine to the SLURM queue/partition in the container
 * ~~"accounting DB" use-case or something similar~~
 
 ## Making the service accessible from Host
